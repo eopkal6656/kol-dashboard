@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KOL Management Workbench</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-50 font-sans text-gray-800">
+  <div id="app" class="p-6 max-w-7xl mx-auto">
+    <!-- Header -->
+    <header class="flex justify-between items-center mb-6">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">红人合作管理工作台</h1>
+        <p class="text-sm text-gray-500">追踪海外 KOL 合作进度与数据指标</p>
+      </div>
+      <button @click="showAddModal = true" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium shadow transition">
+        <i class="fa-solid fa-plus mr-2"></i>添加红人
+      </button>
+    </header>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+        <span class="text-xs font-semibold text-gray-400 uppercase">总联系红人</span>
+        <div class="text-2xl font-bold mt-1">{{ kols.length }}</div>
+      </div>
+      <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+        <span class="text-xs font-semibold text-gray-400 uppercase">沟通/寄样中</span>
+        <div class="text-2xl font-bold mt-1 text-amber-600">{{ getStatusCount('In Progress') }}</div>
+      </div>
+      <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+        <span class="text-xs font-semibold text-gray-400 uppercase">已上线视频</span>
+        <div class="text-2xl font-bold mt-1 text-emerald-600">{{ getStatusCount('Published') }}</div>
+      </div>
+      <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+        <span class="text-xs font-semibold text-gray-400 uppercase">预估总曝光量</span>
+        <div class="text-2xl font-bold mt-1 text-indigo-600">{{ totalViews.toLocaleString() }}</div>
+      </div>
+    </div>
+
+    <!-- Data Table -->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <table class="w-full text-left border-collapse">
+        <thead class="bg-gray-50 text-gray-500 text-xs uppercase font-medium border-b border-gray-200">
+          <tr>
+            <th class="p-4">红人/渠道</th>
+            <th class="p-4">平台</th>
+            <th class="p-4">粉丝数</th>
+            <th class="p-4">拟合作产品</th>
+            <th class="p-4">合作状态</th>
+            <th class="p-4">前15视频平均播放量</th>
+            <th class="p-4 text-right">操作</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 text-sm">
+          <tr v-for="(kol, index) in kols" :key="index" class="hover:bg-gray-50 transition">
+            <td class="p-4 font-medium text-gray-900">
+              <a :href="kol.link" target="_blank" class="hover:text-indigo-600 flex items-center gap-2">
+                {{ kol.name }} <i class="fa-solid fa-arrow-up-right-from-square text-xs text-gray-400"></i>
+              </a>
+            </td>
+            <td class="p-4">
+              <span class="px-2 py-1 rounded text-xs font-semibold" :class="getPlatformClass(kol.platform)">
+                {{ kol.platform }}
+              </span>
+            </td>
+            <td class="p-4">{{ kol.followers }}</td>
+            <td class="p-4">{{ kol.product }}</td>
+            <td class="p-4">
+              <select v-model="kol.status" @change="saveData" class="text-xs rounded border-gray-300 p-1 border">
+                <option value="Contacted">已建联</option>
+                <option value="In Progress">沟通/寄样中</option>
+                <option value="Published">已上线视频</option>
+                <option value="Passed">暂不合作</option>
+              </select>
+            </td>
+            <td class="p-4">{{ kol.avgViews.toLocaleString() }}</td>
+            <td class="p-4 text-right">
+              <button @click="deleteKol(index)" class="text-red-500 hover:text-red-700 text-xs">删除</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Add Modal -->
+    <div v-if="showAddModal" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-xl max-w-md w-full p-6 shadow-xl">
+        <h3 class="text-lg font-bold mb-4">添加红人数据</h3>
+        <div class="space-y-3">
+          <input v-model="newKol.name" placeholder="红人名称/Channel Name" class="w-full border rounded p-2 text-sm">
+          <input v-model="newKol.link" placeholder="主页链接" class="w-full border rounded p-2 text-sm">
+          <select v-model="newKol.platform" class="w-full border rounded p-2 text-sm">
+            <option value="YouTube">YouTube</option>
+            <option value="TikTok">TikTok</option>
+            <option value="Instagram">Instagram</option>
+          </select>
+          <input v-model="newKol.followers" placeholder="粉丝量 (如: 150K)" class="w-full border rounded p-2 text-sm">
+          <input v-model="newKol.product" placeholder="合作产品" class="w-full border rounded p-2 text-sm">
+          <input v-model.number="newKol.avgViews" type="number" placeholder="前15视频平均播放量" class="w-full border rounded p-2 text-sm">
+        </div>
+        <div class="flex justify-end gap-2 mt-5">
+          <button @click="showAddModal = false" class="px-4 py-2 border rounded text-sm">取消</button>
+          <button @click="addKol" class="px-4 py-2 bg-indigo-600 text-white rounded text-sm">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { createApp } = Vue
+    createApp({
+      data() {
+        return {
+          showAddModal: false,
+          kols: JSON.parse(localStorage.getItem('kols_data') || '[]'),
+          newKol: { name: '', link: '', platform: 'YouTube', followers: '', product: '', status: 'Contacted', avgViews: 0 }
+        }
+      },
+      computed: {
+        totalViews() {
+          return this.kols.reduce((acc, curr) => acc + (Number(curr.avgViews) || 0), 0);
+        }
+      },
+      methods: {
+        addKol() {
+          if (!this.newKol.name) return;
+          this.kols.push({ ...this.newKol });
+          this.saveData();
+          this.newKol = { name: '', link: '', platform: 'YouTube', followers: '', product: '', status: 'Contacted', avgViews: 0 };
+          this.showAddModal = false;
+        },
+        deleteKol(index) {
+          this.kols.splice(index, 1);
+          this.saveData();
+        },
+        saveData() {
+          localStorage.setItem('kols_data', JSON.stringify(this.kols));
+        },
+        getStatusCount(status) {
+          return this.kols.filter(k => k.status === status).length;
+        },
+        getPlatformClass(p) {
+          return p === 'YouTube' ? 'bg-red-100 text-red-700' : p === 'TikTok' ? 'bg-gray-100 text-gray-800' : 'bg-pink-100 text-pink-700';
+        }
+      }
+    }).mount('#app')
+  </script>
+</body>
+</html>
