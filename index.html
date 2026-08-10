@@ -3,151 +3,605 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KOL Management Workbench</title>
+  <title>Picacast 风格 - 红人管理工作台</title>
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Vue 3 -->
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <!-- FontAwesome 图标库 -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- SheetJS (Excel 导入导出支持) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    [v-cloak] { display: none; }
+    /* 自定义滚动条 */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
 </head>
-<body class="bg-gray-50 font-sans text-gray-800">
-  <div id="app" class="p-6 max-w-7xl mx-auto">
-    <!-- Header -->
-    <header class="flex justify-between items-center mb-6">
-      <div>
-        <h1 class="text-2xl font-bold text-gray-900">红人合作管理工作台</h1>
-        <p class="text-sm text-gray-500">追踪海外 KOL 合作进度与数据指标</p>
+<body class="bg-slate-50 font-sans text-slate-800 antialiased">
+  <div id="app" v-cloak class="flex h-screen overflow-hidden">
+    
+    <!-- 1. 左侧菜单栏 -->
+    <aside class="w-64 bg-slate-900 text-slate-300 flex flex-col shrink-0">
+      <div class="p-5 border-b border-slate-800 flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold">P</div>
+        <span class="font-bold text-white text-lg tracking-wide">Picacast KOL</span>
       </div>
-      <button @click="showAddModal = true" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium shadow transition">
-        <i class="fa-solid fa-plus mr-2"></i>添加红人
-      </button>
-    </header>
+      
+      <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+        <button @click="currentTab = 'home'" :class="['w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition text-sm', currentTab === 'home' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 text-slate-400 hover:text-slate-200']">
+          <i class="fa-solid fa-house w-5"></i> 首页（工作安排）
+        </button>
+        <button @click="currentTab = 'calendar'" :class="['w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition text-sm', currentTab === 'calendar' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 text-slate-400 hover:text-slate-200']">
+          <i class="fa-solid fa-calendar-days w-5"></i> 活动日历
+        </button>
+        <button @click="currentTab = 'database'" :class="['w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition text-sm', currentTab === 'database' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 text-slate-400 hover:text-slate-200']">
+          <i class="fa-solid fa-users-viewfinder w-5"></i> 达人库
+        </button>
+        <button @click="currentTab = 'social'" :class="['w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition text-sm', currentTab === 'social' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 text-slate-400 hover:text-slate-200']">
+          <i class="fa-solid fa-share-nodes w-5"></i> 官方社媒导航
+        </button>
+      </nav>
 
-    <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-      <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-        <span class="text-xs font-semibold text-gray-400 uppercase">总联系红人</span>
-        <div class="text-2xl font-bold mt-1">{{ kols.length }}</div>
+      <div class="p-4 border-t border-slate-800 text-xs text-slate-500 text-center">
+        KOL Workspace v2.1
       </div>
-      <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-        <span class="text-xs font-semibold text-gray-400 uppercase">沟通/寄样中</span>
-        <div class="text-2xl font-bold mt-1 text-amber-600">{{ getStatusCount('In Progress') }}</div>
-      </div>
-      <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-        <span class="text-xs font-semibold text-gray-400 uppercase">已上线视频</span>
-        <div class="text-2xl font-bold mt-1 text-emerald-600">{{ getStatusCount('Published') }}</div>
-      </div>
-      <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-        <span class="text-xs font-semibold text-gray-400 uppercase">预估总曝光量</span>
-        <div class="text-2xl font-bold mt-1 text-indigo-600">{{ totalViews.toLocaleString() }}</div>
-      </div>
-    </div>
+    </aside>
 
-    <!-- Data Table -->
-    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-      <table class="w-full text-left border-collapse">
-        <thead class="bg-gray-50 text-gray-500 text-xs uppercase font-medium border-b border-gray-200">
-          <tr>
-            <th class="p-4">红人/渠道</th>
-            <th class="p-4">平台</th>
-            <th class="p-4">粉丝数</th>
-            <th class="p-4">拟合作产品</th>
-            <th class="p-4">合作状态</th>
-            <th class="p-4">前15视频平均播放量</th>
-            <th class="p-4 text-right">操作</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-gray-200 text-sm">
-          <tr v-for="(kol, index) in kols" :key="index" class="hover:bg-gray-50 transition">
-            <td class="p-4 font-medium text-gray-900">
-              <a :href="kol.link" target="_blank" class="hover:text-indigo-600 flex items-center gap-2">
-                {{ kol.name }} <i class="fa-solid fa-arrow-up-right-from-square text-xs text-gray-400"></i>
-              </a>
-            </td>
-            <td class="p-4">
-              <span class="px-2 py-1 rounded text-xs font-semibold" :class="getPlatformClass(kol.platform)">
-                {{ kol.platform }}
-              </span>
-            </td>
-            <td class="p-4">{{ kol.followers }}</td>
-            <td class="p-4">{{ kol.product }}</td>
-            <td class="p-4">
-              <select v-model="kol.status" @change="saveData" class="text-xs rounded border-gray-300 p-1 border">
-                <option value="Contacted">已建联</option>
-                <option value="In Progress">沟通/寄样中</option>
-                <option value="Published">已上线视频</option>
-                <option value="Passed">暂不合作</option>
+    <!-- 主体区域 -->
+    <main class="flex-1 flex flex-col overflow-y-auto">
+      
+      <!-- 页头 Header -->
+      <header class="bg-white border-b border-slate-200 px-8 py-4 flex justify-between items-center sticky top-0 z-10">
+        <h2 class="text-xl font-bold text-slate-800">
+          <span v-if="currentTab === 'home'">首页 - 工作安排</span>
+          <span v-if="currentTab === 'calendar'">活动日历</span>
+          <span v-if="currentTab === 'database'">达人库管理</span>
+          <span v-if="currentTab === 'social'">社媒快捷导航</span>
+        </h2>
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-slate-500">已登记达人：<strong class="text-indigo-600">{{ kols.length }}</strong> 人</span>
+        </div>
+      </header>
+
+      <!-- 视图内容区域 -->
+      <div class="p-8 flex-1">
+        
+        <!-- ==================== 1. 首页：工作安排 ==================== -->
+        <section v-if="currentTab === 'home'" class="space-y-6">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+              <h3 class="font-bold text-slate-700 mb-3 flex items-center gap-2">
+                <i class="fa-solid fa-list-check text-indigo-600"></i> 今日待办
+              </h3>
+              <div class="space-y-2">
+                <div v-for="(todo, i) in todos" :key="i" class="flex items-center justify-between p-2 hover:bg-slate-50 rounded">
+                  <label class="flex items-center gap-2 cursor-pointer text-sm">
+                    <input type="checkbox" v-model="todo.done" class="rounded text-indigo-600">
+                    <span :class="{'line-through text-slate-400': todo.done}">{{ todo.text }}</span>
+                  </label>
+                  <button @click="todos.splice(i, 1)" class="text-slate-400 hover:text-red-500 text-xs"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+              </div>
+              <div class="mt-4 flex gap-2">
+                <input v-model="newTodo" @keyup.enter="addTodo" placeholder="添加新任务..." class="flex-1 text-sm border rounded px-3 py-1.5 border-slate-300">
+                <button @click="addTodo" class="bg-indigo-600 text-white px-3 py-1.5 rounded text-sm hover:bg-indigo-700">添加</button>
+              </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm col-span-2">
+              <h3 class="font-bold text-slate-700 mb-3 flex items-center gap-2">
+                <i class="fa-solid fa-bullhorn text-amber-500"></i> 近期大促节点提醒
+              </h3>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div v-for="event in upcomingEvents" :key="event.id" class="p-4 rounded-lg bg-amber-50 border border-amber-200">
+                  <div class="font-bold text-amber-900">{{ event.title }}</div>
+                  <div class="text-xs text-amber-700 mt-1"><i class="fa-regular fa-clock"></i> {{ event.date }}</div>
+                  <p class="text-xs text-amber-800 mt-2">{{ event.note }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 2. 日历 ==================== -->
+        <section v-if="currentTab === 'calendar'" class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex justify-between items-center">
+            <h3 class="font-bold text-lg text-slate-800">大促活动营销日历</h3>
+            <button @click="showAddEventModal = true" class="bg-indigo-600 text-white text-xs px-3 py-2 rounded-lg hover:bg-indigo-700">
+              <i class="fa-solid fa-plus mr-1"></i> 新增营销节点
+            </button>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div v-for="(event, idx) in events" :key="idx" class="p-4 border rounded-xl relative hover:border-indigo-400 transition">
+              <span class="text-xs font-bold px-2 py-0.5 rounded bg-indigo-100 text-indigo-700 uppercase">{{ event.type }}</span>
+              <h4 class="font-bold text-slate-800 mt-2">{{ event.title }}</h4>
+              <p class="text-xs text-slate-500 mt-1"><i class="fa-regular fa-calendar"></i> {{ event.date }}</p>
+              <p class="text-sm text-slate-600 mt-2 bg-slate-50 p-2 rounded">{{ event.note }}</p>
+              <button @click="events.splice(idx, 1); saveEvents()" class="absolute top-3 right-3 text-slate-400 hover:text-red-500 text-xs">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 3. 达人库 ==================== -->
+        <section v-if="currentTab === 'database'" class="space-y-4">
+          
+          <!-- 工具栏 -->
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap gap-3 justify-between items-center">
+            
+            <!-- 筛选框 -->
+            <div class="flex flex-wrap items-center gap-2 text-sm">
+              <input v-model="filters.search" placeholder="搜索账号/邮箱/国家..." class="border rounded-lg px-3 py-1.5 border-slate-300 w-48">
+              <select v-model="filters.platform" class="border rounded-lg px-2 py-1.5 border-slate-300">
+                <option value="">所有平台</option>
+                <option value="YouTube">YouTube</option>
+                <option value="TikTok">TikTok</option>
+                <option value="Instagram">Instagram</option>
               </select>
-            </td>
-            <td class="p-4">{{ kol.avgViews.toLocaleString() }}</td>
-            <td class="p-4 text-right">
-              <button @click="deleteKol(index)" class="text-red-500 hover:text-red-700 text-xs">删除</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+              <select v-model="filters.status" class="border rounded-lg px-2 py-1.5 border-slate-300">
+                <option value="">所有合作状态</option>
+                <option value="待沟通">待沟通</option>
+                <option value="沟通中">沟通中</option>
+                <option value="已寄样">已寄样</option>
+                <option value="已发布">已发布</option>
+                <option value="暂不合作">暂不合作</option>
+              </select>
+            </div>
 
-    <!-- Add Modal -->
-    <div v-if="showAddModal" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4">
-      <div class="bg-white rounded-xl max-w-md w-full p-6 shadow-xl">
-        <h3 class="text-lg font-bold mb-4">添加红人数据</h3>
-        <div class="space-y-3">
-          <input v-model="newKol.name" placeholder="红人名称/Channel Name" class="w-full border rounded p-2 text-sm">
-          <input v-model="newKol.link" placeholder="主页链接" class="w-full border rounded p-2 text-sm">
-          <select v-model="newKol.platform" class="w-full border rounded p-2 text-sm">
-            <option value="YouTube">YouTube</option>
-            <option value="TikTok">TikTok</option>
-            <option value="Instagram">Instagram</option>
-          </select>
-          <input v-model="newKol.followers" placeholder="粉丝量 (如: 150K)" class="w-full border rounded p-2 text-sm">
-          <input v-model="newKol.product" placeholder="合作产品" class="w-full border rounded p-2 text-sm">
-          <input v-model.number="newKol.avgViews" type="number" placeholder="前15视频平均播放量" class="w-full border rounded p-2 text-sm">
+            <!-- 操作按钮 -->
+            <div class="flex items-center gap-2">
+              <button @click="downloadTemplate" class="border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs px-3 py-2 rounded-lg">
+                <i class="fa-solid fa-download mr-1"></i> Excel模板
+              </button>
+              <label class="border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs px-3 py-2 rounded-lg cursor-pointer">
+                <i class="fa-solid fa-file-import mr-1"></i> 批量导入
+                <input type="file" @change="importExcel" accept=".xlsx, .xls" class="hidden">
+              </label>
+              <button @click="exportExcel" class="border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs px-3 py-2 rounded-lg">
+                <i class="fa-solid fa-file-excel mr-1 text-emerald-600"></i> 导出Excel
+              </button>
+              <button @click="showColumnConfig = true" class="border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs px-3 py-2 rounded-lg">
+                <i class="fa-solid fa-sliders mr-1"></i> 显示/隐藏列
+              </button>
+              <button @click="showAddKolModal = true" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-4 py-2 rounded-lg font-medium shadow-sm">
+                <i class="fa-solid fa-plus mr-1"></i> 添加达人
+              </button>
+            </div>
+          </div>
+
+          <!-- 批量操作 bar -->
+          <div v-if="selectedKols.length > 0" class="bg-indigo-50 border border-indigo-200 p-3 rounded-xl flex items-center justify-between text-xs text-indigo-900">
+            <span>已选中 <strong>{{ selectedKols.length }}</strong> 位达人</span>
+            <div class="flex items-center gap-3">
+              <span>批量修改合作状态：</span>
+              <select @change="batchUpdateStatus($event.target.value)" class="border rounded px-2 py-1 bg-white border-indigo-300">
+                <option value="">选择状态...</option>
+                <option value="待沟通">待沟通</option>
+                <option value="沟通中">沟通中</option>
+                <option value="已寄样">已寄样</option>
+                <option value="已发布">已发布</option>
+                <option value="暂不合作">暂不合作</option>
+              </select>
+              <button @click="batchDelete" class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">批量删除</button>
+            </div>
+          </div>
+
+          <!-- 表格主体 -->
+          <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead class="bg-slate-100 text-slate-600 font-semibold uppercase border-b border-slate-200">
+                <tr>
+                  <th class="p-3 w-8"><input type="checkbox" @change="toggleSelectAll" :checked="isAllSelected"></th>
+                  <th v-if="visibleCols.account" class="p-3">账号</th>
+                  <th v-if="visibleCols.platform" class="p-3">平台</th>
+                  <th v-if="visibleCols.type" class="p-3">类型</th>
+                  <th v-if="visibleCols.regStatus" class="p-3">登记情况</th>
+                  <th v-if="visibleCols.region" class="p-3">地区</th>
+                  <th v-if="visibleCols.tier" class="p-3">粉丝量级</th>
+                  <th v-if="visibleCols.grade" class="p-3">频道等级</th>
+                  <th v-if="visibleCols.email" class="p-3">邮箱</th>
+                  <th v-if="visibleCols.link" class="p-3">链接</th>
+                  <th v-if="visibleCols.status" class="p-3">合作状态</th>
+                  <th v-if="visibleCols.engagement" class="p-3">互动率</th>
+                  <th v-if="visibleCols.records" class="p-3">合作记录</th>
+                  <th v-if="visibleCols.updatedAt" class="p-3">数据更新时间</th>
+                  <th class="p-3 text-right">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-200">
+                <tr v-for="(kol, index) in filteredKols" :key="kol.id" class="hover:bg-slate-50 transition">
+                  <td class="p-3"><input type="checkbox" :value="kol.id" v-model="selectedKols"></td>
+                  <td v-if="visibleCols.account" class="p-3 font-bold text-slate-800">{{ kol.account }}</td>
+                  <td v-if="visibleCols.platform" class="p-3">
+                    <span :class="['px-2 py-0.5 rounded font-semibold', getPlatformBadge(kol.platform)]">{{ kol.platform }}</span>
+                  </td>
+                  <td v-if="visibleCols.type" class="p-3">{{ kol.type || '-' }}</td>
+                  <td v-if="visibleCols.regStatus" class="p-3">{{ kol.regStatus || '-' }}</td>
+                  <td v-if="visibleCols.region" class="p-3">{{ kol.region || '-' }}</td>
+                  <!-- 自动计算的粉丝量级 -->
+                  <td v-if="visibleCols.tier" class="p-3">
+                    <span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-medium">{{ calculateTier(kol.followers) }}</span>
+                  </td>
+                  <!-- 自动计算的频道等级 -->
+                  <td v-if="visibleCols.grade" class="p-3">
+                    <span :class="['px-2 py-0.5 rounded font-bold', getGradeBadge(calculateGrade(kol.platform, kol.avgViews, kol.avgLikes))]">
+                      {{ calculateGrade(kol.platform, kol.avgViews, kol.avgLikes) }}
+                    </span>
+                  </td>
+                  <td v-if="visibleCols.email" class="p-3 text-slate-500">{{ kol.email || '-' }}</td>
+                  <td v-if="visibleCols.link" class="p-3">
+                    <a :href="kol.link" target="_blank" class="text-indigo-600 hover:underline"><i class="fa-solid fa-arrow-up-right-from-square"></i> 打开</a>
+                  </td>
+                  <td v-if="visibleCols.status" class="p-3">
+                    <select v-model="kol.status" @change="updateKol(kol)" class="border rounded p-1 border-slate-300 bg-white">
+                      <option value="待沟通">待沟通</option>
+                      <option value="沟通中">沟通中</option>
+                      <option value="已寄样">已寄样</option>
+                      <option value="已发布">已发布</option>
+                      <option value="暂不合作">暂不合作</option>
+                    </select>
+                  </td>
+                  <!-- 自动计算的互动率 -->
+                  <td v-if="visibleCols.engagement" class="p-3 font-semibold text-slate-700">
+                    {{ calculateEngagement(kol.avgViews, kol.avgLikes) }}
+                  </td>
+                  <td v-if="visibleCols.records" class="p-3 max-w-xs truncate" :title="kol.records">{{ kol.records || '无' }}</td>
+                  <td v-if="visibleCols.updatedAt" class="p-3 text-slate-400">{{ kol.updatedAt }}</td>
+                  <td class="p-3 text-right space-x-2">
+                    <button @click="fetchKolData(kol)" class="text-indigo-600 hover:text-indigo-800" title="API抓取最新数据"><i class="fa-solid fa-rotate"></i></button>
+                    <button @click="deleteKol(kol.id)" class="text-red-500 hover:text-red-700"><i class="fa-solid fa-trash"></i></button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ==================== 4. 官方社媒导航 ==================== -->
+        <section v-if="currentTab === 'social'" class="space-y-4">
+          <div class="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200">
+            <h3 class="font-bold text-slate-800">便捷社媒快捷导航</h3>
+            <button @click="showAddSocialModal = true" class="bg-indigo-600 text-white text-xs px-3 py-2 rounded-lg hover:bg-indigo-700">
+              <i class="fa-solid fa-plus mr-1"></i> 添加快捷链接
+            </button>
+          </div>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <a v-for="(link, i) in socialLinks" :key="i" :href="link.url" target="_blank" class="bg-white p-4 rounded-xl border border-slate-200 hover:border-indigo-500 shadow-sm transition flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg">
+                <i :class="link.icon || 'fa-solid fa-link'"></i>
+              </div>
+              <div class="overflow-hidden">
+                <div class="font-bold text-sm text-slate-800 truncate">{{ link.name }}</div>
+                <div class="text-xs text-slate-400 truncate">{{ link.url }}</div>
+              </div>
+            </a>
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+    <!-- 弹窗：自定义列选择 -->
+    <div v-if="showColumnConfig" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div class="bg-white rounded-xl p-6 max-w-md w-full shadow-xl">
+        <h3 class="font-bold text-lg mb-4">自定义表格显示列</h3>
+        <div class="grid grid-cols-2 gap-3 text-sm">
+          <label v-for="(val, key) in colNames" :key="key" class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" v-model="visibleCols[key]" class="rounded text-indigo-600">
+            <span>{{ val }}</span>
+          </label>
         </div>
-        <div class="flex justify-end gap-2 mt-5">
-          <button @click="showAddModal = false" class="px-4 py-2 border rounded text-sm">取消</button>
-          <button @click="addKol" class="px-4 py-2 bg-indigo-600 text-white rounded text-sm">保存</button>
+        <div class="mt-6 flex justify-end">
+          <button @click="showColumnConfig = false; saveCols()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm">保存配置</button>
         </div>
       </div>
     </div>
+
+    <!-- 弹窗：手动新增达人 -->
+    <div v-if="showAddKolModal" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div class="bg-white rounded-xl p-6 max-w-lg w-full shadow-xl max-h-[90vh] overflow-y-auto">
+        <h3 class="font-bold text-lg mb-4">手动添加达人</h3>
+        <div class="space-y-3 text-sm">
+          <input v-model="newKol.account" placeholder="账号名称 *" class="w-full border rounded p-2 border-slate-300">
+          <div class="grid grid-cols-2 gap-2">
+            <select v-model="newKol.platform" class="border rounded p-2 border-slate-300">
+              <option value="YouTube">YouTube</option>
+              <option value="TikTok">TikTok</option>
+              <option value="Instagram">Instagram</option>
+            </select>
+            <input v-model="newKol.region" placeholder="地区 (例: US)" class="border rounded p-2 border-slate-300">
+          </div>
+          <input v-model="newKol.link" placeholder="主页链接" class="w-full border rounded p-2 border-slate-300">
+          <input v-model="newKol.email" placeholder="邮箱" class="w-full border rounded p-2 border-slate-300">
+          <div class="grid grid-cols-3 gap-2">
+            <input v-model.number="newKol.followers" type="number" placeholder="粉丝量" class="border rounded p-2 border-slate-300">
+            <input v-model.number="newKol.avgViews" type="number" placeholder="平均播放量" class="border rounded p-2 border-slate-300">
+            <input v-model.number="newKol.avgLikes" type="number" placeholder="平均点赞数" class="border rounded p-2 border-slate-300">
+          </div>
+          <input v-model="newKol.type" placeholder="内容类型 (例: Tech/Beauty)" class="w-full border rounded p-2 border-slate-300">
+          <textarea v-model="newKol.records" placeholder="合作记录/备注" class="w-full border rounded p-2 border-slate-300"></textarea>
+        </div>
+        <div class="mt-6 flex justify-end gap-2">
+          <button @click="showAddKolModal = false" class="border px-4 py-2 rounded text-sm">取消</button>
+          <button @click="addKol" class="bg-indigo-600 text-white px-4 py-2 rounded text-sm">保存达人</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <script>
-    const { createApp } = Vue
+    const { createApp } = Vue;
+
     createApp({
       data() {
         return {
-          showAddModal: false,
-          kols: JSON.parse(localStorage.getItem('kols_data') || '[]'),
-          newKol: { name: '', link: '', platform: 'YouTube', followers: '', product: '', status: 'Contacted', avgViews: 0 }
-        }
+          currentTab: 'database',
+          showColumnConfig: false,
+          showAddKolModal: false,
+          showAddEventModal: false,
+          showAddSocialModal: false,
+          
+          // 待办事项
+          todos: JSON.parse(localStorage.getItem('kol_todos') || '[{"text":"抓取已寄样红人视频","done":false}]'),
+          newTodo: '',
+
+          // 营销日历数据
+          events: JSON.parse(localStorage.getItem('kol_events') || '[{"id":1,"title":"Prime Day 大促","date":"2026-07-15","type":"促销","note":"需提早1个月安排达人预热"}]'),
+
+          // 官方社媒导航链接
+          socialLinks: JSON.parse(localStorage.getItem('kol_socials') || '[{"name":"官方 YouTube","url":"https://youtube.com","icon":"fa-brands fa-youtube"},{"name":"官方 TikTok","url":"https://tiktok.com","icon":"fa-brands fa-tiktok"}]'),
+
+          // 表格动态列
+          colNames: {
+            account: '账号', platform: '平台', type: '类型', regStatus: '登记情况',
+            region: '地区', tier: '粉丝量级', grade: '频道等级', email: '邮箱',
+            link: '链接', status: '合作状态', engagement: '互动率', records: '合作记录', updatedAt: '数据更新时间'
+          },
+          visibleCols: JSON.parse(localStorage.getItem('kol_cols') || JSON.stringify({
+            account: true, platform: true, type: true, regStatus: true, region: true,
+            tier: true, grade: true, email: true, link: true, status: true, engagement: true, records: true, updatedAt: true
+          })),
+
+          // 筛选器
+          filters: { search: '', platform: '', status: '' },
+
+          // 选中的项（用于批量操作）
+          selectedKols: [],
+
+          // 主数据
+          kols: JSON.parse(localStorage.getItem('kol_data') || '[]'),
+          
+          // 新增模版数据
+          newKol: { account: '', platform: 'YouTube', link: '', email: '', region: '', followers: 0, avgViews: 0, avgLikes: 0, type: '', regStatus: '已登记', status: '待沟通', records: '' }
+        };
       },
       computed: {
-        totalViews() {
-          return this.kols.reduce((acc, curr) => acc + (Number(curr.avgViews) || 0), 0);
+        filteredKols() {
+          return this.kols.filter(k => {
+            const matchSearch = !this.filters.search || (k.account + k.email + k.region).toLowerCase().includes(this.filters.search.toLowerCase());
+            const matchPlatform = !this.filters.platform || k.platform === this.filters.platform;
+            const matchStatus = !this.filters.status || k.status === this.filters.status;
+            return matchSearch && matchPlatform && matchStatus;
+          });
+        },
+        isAllSelected() {
+          return this.filteredKols.length > 0 && this.selectedKols.length === this.filteredKols.length;
+        },
+        upcomingEvents() {
+          return this.events.slice(0, 3);
         }
       },
       methods: {
-        addKol() {
-          if (!this.newKol.name) return;
-          this.kols.push({ ...this.newKol });
-          this.saveData();
-          this.newKol = { name: '', link: '', platform: 'YouTube', followers: '', product: '', status: 'Contacted', avgViews: 0 };
-          this.showAddModal = false;
+        // ---- 自动数据算法逻辑 ----
+        
+        // 1. 粉丝量级分类
+        calculateTier(followers) {
+          const num = Number(followers) || 0;
+          if (num >= 500000) return 'Mega (500K+)';
+          if (num >= 100000) return 'Mid-tier (100K-500K)';
+          if (num >= 10000)  return 'Micro (10K-100K)';
+          return 'Nano (1K-10K)';
         },
-        deleteKol(index) {
-          this.kols.splice(index, 1);
-          this.saveData();
+
+        // 2. 互动率计算
+        calculateEngagement(views, likes) {
+          const v = Number(views) || 0;
+          const l = Number(likes) || 0;
+          if (v === 0) return '0%';
+          return ((l / v) * 100).toFixed(2) + '%';
         },
+
+        // 3. 多平台频道等级算法
+        calculateGrade(platform, views, likes) {
+          const v = Number(views) || 0;
+          const l = Number(likes) || 0;
+
+          if (platform === 'YouTube') {
+            if (v >= 10000) return 'A级';
+            if (v >= 5000)  return 'B级';
+            if (v >= 3500)  return 'C+级';
+            if (v >= 1000)  return 'C级';
+            return 'D级';
+          } 
+          else if (platform === 'TikTok') {
+            if (v >= 50000 || l >= 3000) return 'A级';
+            if (v >= 35000 || l >= 2000) return 'B级';
+            if (v >= 20000 || l >= 1000) return 'C+级';
+            if (v >= 10000 || l >= 500)  return 'C级';
+            return 'D级';
+          } 
+          else if (platform === 'Instagram') {
+            if (l >= 1500) return 'A级';
+            if (l >= 750)  return 'B级';
+            if (l >= 500)  return 'C+级';
+            if (l >= 300)  return 'C级';
+            return 'D级';
+          }
+
+          return '未评估';
+        },
+
+        // ---- UI Badge 颜色 ----
+        getPlatformBadge(p) {
+          return p === 'YouTube' ? 'bg-red-100 text-red-600' : p === 'TikTok' ? 'bg-slate-800 text-white' : 'bg-pink-100 text-pink-600';
+        },
+        getGradeBadge(g) {
+          if (g === 'A级') return 'bg-amber-100 text-amber-700 border border-amber-300';
+          if (g === 'B级') return 'bg-indigo-100 text-indigo-700';
+          if (g === 'C+级') return 'bg-blue-100 text-blue-700';
+          if (g === 'C级') return 'bg-emerald-100 text-emerald-700';
+          return 'bg-slate-100 text-slate-600';
+        },
+
+        // ---- 数据保存 & 操纵 ----
         saveData() {
-          localStorage.setItem('kols_data', JSON.stringify(this.kols));
+          localStorage.setItem('kol_data', JSON.stringify(this.kols));
         },
-        getStatusCount(status) {
-          return this.kols.filter(k => k.status === status).length;
+        getNowTime() {
+          const d = new Date();
+          return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
         },
-        getPlatformClass(p) {
-          return p === 'YouTube' ? 'bg-red-100 text-red-700' : p === 'TikTok' ? 'bg-gray-100 text-gray-800' : 'bg-pink-100 text-pink-700';
+        addKol() {
+          if (!this.newKol.account) return alert('请输入账号名称');
+          const item = { ...this.newKol, id: Date.now(), updatedAt: this.getNowTime() };
+          this.kols.unshift(item);
+          this.saveData();
+          this.showAddKolModal = false;
+          this.newKol = { account: '', platform: 'YouTube', link: '', email: '', region: '', followers: 0, avgViews: 0, avgLikes: 0, type: '', regStatus: '已登记', status: '待沟通', records: '' };
+        },
+        updateKol(kol) {
+          kol.updatedAt = this.getNowTime();
+          this.saveData();
+        },
+        deleteKol(id) {
+          if (confirm('确定删除该达人吗？')) {
+            this.kols = this.kols.filter(k => k.id !== id);
+            this.saveData();
+          }
+        },
+
+        // ---- 批量选择与操作 ----
+        toggleSelectAll(e) {
+          if (e.target.checked) {
+            this.selectedKols = this.filteredKols.map(k => k.id);
+          } else {
+            this.selectedKols = [];
+          }
+        },
+        batchUpdateStatus(status) {
+          if (!status) return;
+          this.kols.forEach(k => {
+            if (this.selectedKols.includes(k.id)) {
+              k.status = status;
+              k.updatedAt = this.getNowTime();
+            }
+          });
+          this.saveData();
+          this.selectedKols = [];
+        },
+        batchDelete() {
+          if (confirm(`确定删除选中的 ${this.selectedKols.length} 位达人吗？`)) {
+            this.kols = this.kols.filter(k => !this.selectedKols.includes(k.id));
+            this.saveData();
+            this.selectedKols = [];
+          }
+        },
+
+        // ---- Excel 导入导出与模板下载 ----
+        downloadTemplate() {
+          const templateData = [
+            { "账号": "TechReviews101", "平台": "YouTube", "主页链接": "https://youtube.com", "邮箱": "contact@tech.com", "国家地区": "US", "粉丝量": 120000, "前15平均播放量": 25000, "前15平均点赞量": 1800, "类型": "Tech", "登记情况": "已登记", "合作状态": "沟通中", "合作记录": "已发第一封Outreach" }
+          ];
+          const ws = XLSX.utils.json_to_sheet(templateData);
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, "达人导入模板");
+          XLSX.writeFile(wb, "Picacast_KOL_Import_Template.xlsx");
+        },
+        importExcel(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = (evt) => {
+            const bstr = evt.target.result;
+            const wb = XLSX.read(bstr, { type: 'binary' });
+            const wsName = wb.SheetNames[0];
+            const data = XLSX.utils.sheet_to_json(wb.Sheets[wsName]);
+            
+            let count = 0;
+            data.forEach(row => {
+              this.kols.unshift({
+                id: Date.now() + Math.random(),
+                account: row['账号'] || '未命名',
+                platform: row['平台'] || 'YouTube',
+                link: row['主页链接'] || '',
+                email: row['邮箱'] || '',
+                region: row['国家地区'] || '',
+                followers: Number(row['粉丝量']) || 0,
+                avgViews: Number(row['前15平均播放量']) || 0,
+                avgLikes: Number(row['前15平均点赞量']) || 0,
+                type: row['类型'] || '',
+                regStatus: row['登记情况'] || '已登记',
+                status: row['合作状态'] || '待沟通',
+                records: row['合作记录'] || '',
+                updatedAt: this.getNowTime()
+              });
+              count++;
+            });
+            this.saveData();
+            alert(`成功导入 ${count} 条达人数据！`);
+          };
+          reader.readAsBinaryString(file);
+        },
+        exportExcel() {
+          const exportData = this.kols.map(k => ({
+            "账号": k.account,
+            "平台": k.platform,
+            "类型": k.type,
+            "登记情况": k.regStatus,
+            "地区": k.region,
+            "粉丝量级": this.calculateTier(k.followers),
+            "频道等级": this.calculateGrade(k.platform, k.avgViews, k.avgLikes),
+            "粉丝量": k.followers,
+            "平均播放量": k.avgViews,
+            "平均点赞量": k.avgLikes,
+            "互动率": this.calculateEngagement(k.avgViews, k.avgLikes),
+            "邮箱": k.email,
+            "主页链接": k.link,
+            "合作状态": k.status,
+            "合作记录": k.records,
+            "数据更新时间": k.updatedAt
+          }));
+          const ws = XLSX.utils.json_to_sheet(exportData);
+          const wb = XLSX.utils.book_new();
+          XLSX.utils.book_append_sheet(wb, ws, "KOL数据导出");
+          XLSX.writeFile(wb, `KOL_Export_${new Date().toISOString().slice(0,10)}.xlsx`);
+        },
+
+        // ---- 辅助设置 ----
+        saveCols() {
+          localStorage.setItem('kol_cols', JSON.stringify(this.visibleCols));
+        },
+        addTodo() {
+          if (!this.newTodo) return;
+          this.todos.push({ text: this.newTodo, done: false });
+          localStorage.setItem('kol_todos', JSON.stringify(this.todos));
+          this.newTodo = '';
+        },
+        saveEvents() {
+          localStorage.setItem('kol_events', JSON.stringify(this.events));
+        },
+        fetchKolData(kol) {
+          alert(`已触发【${kol.account}】的API数据更新（预留接口，真实接入时可自动抓取最新播放量/点赞数）`);
+          kol.updatedAt = this.getNowTime();
+          this.saveData();
         }
       }
-    }).mount('#app')
+    }).mount('#app');
   </script>
 </body>
 </html>
